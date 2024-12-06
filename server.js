@@ -53,20 +53,19 @@ async function searchGoogle(query) {
     "+"
   )}&as_sitesearch=https%3A%2F%2Fwww.facebook.com%2F&sourceid=chrome&ie=UTF-8`;
   console.log("url: ", url);
-  await page.goto(url);
 
-  // Trích xuất link đầu tiên từ kết quả tìm kiếm
-  const links = await page.evaluate(() => {
+  await page.goto(url, { waitUntil: "load" });
+
+  const link = await page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll("a"));
-    const facebookLinks = anchors
-      .map((a) => a.href)
-      .filter((href) => href.startsWith("https://www.facebook.com"));
 
-    return facebookLinks.length > 0 ? facebookLinks[0] : "-";
+    const facebookLinks = anchors;
+
+    return facebookLinks.length > 0 ? facebookLinks[0] : null;
   });
 
   await browser.close();
-  return links;
+  return link;
 }
 
 // Lấy thông tin từ fanpage bằng Puppeteer
