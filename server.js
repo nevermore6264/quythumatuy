@@ -32,7 +32,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
         console.log(">>>>>>>>", link);
 
         // const details = link ? await getFanpageDetails(link) : {}; // Lấy thông tin từ fanpage nếu có
-        // results.push({ searchQuery, link, ...details });
+        results.push({ searchQuery, link });
       }
     }
 
@@ -54,14 +54,17 @@ async function searchGoogle(query) {
   )}&as_sitesearch=https%3A%2F%2Fwww.facebook.com%2F&sourceid=chrome&ie=UTF-8`;
   console.log("url: ", url);
 
-  await page.goto(url, { waitUntil: "load" });
-
+  // Lọc và lấy link đầu tiên có dạng "https://www.facebook.com"
   const link = await page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll("a"));
+    const facebookLink = anchors
+      .map((a) => a.href)
+      .filter(
+        (href) =>
+          href.startsWith("https://www.facebook.com") && !href.includes("posts")
+      );
 
-    const facebookLinks = anchors;
-
-    return facebookLinks.length > 0 ? facebookLinks[0] : null;
+    return facebookLink[0] || null; // Trả về link đầu tiên hoặc null nếu không có
   });
 
   await browser.close();
