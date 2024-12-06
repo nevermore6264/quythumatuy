@@ -106,14 +106,15 @@ async function getFanpageDetails(url) {
     };
 
     Object.keys(icons).forEach((key) => {
-      // const element = document.querySelector(`img[src*="${icons[key]}"]`);
-      const element = document.querySelector(
-        `img[src*="https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png"]`
-      );
+      const element = document.querySelector(`img[src*="${icons[key]}"]`);
+      // const element = document.querySelector(
+      //   `img[src*="https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png"]`
+      // );
 
-      const parent = element?.closest("div")?.textContent.trim();
-      if (parent) {
-        data = parent.querySelector("div + div")?.textContent?.trim();
+      const parent = element.closest("div");
+      const value = parent?.querySelector("div + div")?.textContent?.trim();
+      if (value) {
+        data[key] = value;
       }
     });
 
