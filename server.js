@@ -92,20 +92,43 @@ async function searchGoogle(query) {
 
 // Lấy thông tin từ fanpage bằng Puppeteer
 async function getFanpageDetails(url) {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: "networkidle2" });
 
   const details = await page.evaluate(() => {
-    const intro = document
-      .getElementsByClassName("html-div")[28]
-      .querySelector("ul");
-    // const phone = infor.querySelector("[data-testid='phone']")?.textContent;
-    // const email = infor.querySelector("[data-testid='email']")?.textContent;
-    // const address = infor.querySelector(
-    //   "[data-testid='address']"
-    // )?.textContent;
-    return intro?.textContent;
+    // Danh sách URL của các biểu tượng
+    const icons = {
+      phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
+      email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
+      address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/4Lea07Woawi.png",
+      other: "https://static.xx.fbcdn.net/rsrc.php/v4/y0/r/mp_faH0qhrY.png",
+    };
+
+    // Hàm để tìm nội dung gần biểu tượng
+    const getInfoByIcon = (iconURL) => {
+      const iconElement = document.querySelector(`img[src="${iconURL}"]`);
+      if (iconElement) {
+        const parent = iconElement.closest("div");
+        if (parent) {
+          return parent.querySelector("div + div")?.textContent?.trim();
+        }
+      }
+      return null;
+    };
+
+    // Lấy thông tin từ từng biểu tượng
+    const phone = getInfoByIcon(icons.phone);
+    const email = getInfoByIcon(icons.email);
+    const address = getInfoByIcon(icons.address);
+    const other = getInfoByIcon(icons.other);
+
+    return {
+      phone: phone || "Không tìm thấy số điện thoại",
+      email: email || "Không tìm thấy email",
+      address: address || "Không tìm thấy địa chỉ",
+      other: other || "Không tìm thấy thông tin cố định khác",
+    };
   });
 
   await browser.close();
