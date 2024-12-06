@@ -90,45 +90,34 @@ async function searchGoogle(query) {
   return facebookLink || "-";
 }
 
-// Lấy thông tin từ fanpage bằng Puppeteer
+// Hàm lấy thông tin từ fanpage
 async function getFanpageDetails(url) {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: "networkidle2" });
 
+  // Lấy dữ liệu từ các biểu tượng
   const details = await page.evaluate(() => {
-    // Danh sách URL của các biểu tượng
+    const data = {};
     const icons = {
-      phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
-      email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
-      address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/4Lea07Woawi.png",
-      other: "https://static.xx.fbcdn.net/rsrc.php/v4/y0/r/mp_faH0qhrY.png",
+      // phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
+      // email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
+      address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
     };
 
-    // Hàm để tìm nội dung gần biểu tượng
-    const getInfoByIcon = (iconURL) => {
-      const iconElement = document.querySelector(`img[src="${iconURL}"]`);
-      if (iconElement) {
-        const parent = iconElement.closest("div");
-        if (parent) {
-          return parent.querySelector("div + div")?.textContent?.trim();
-        }
+    Object.keys(icons).forEach((key) => {
+      // const element = document.querySelector(`img[src*="${icons[key]}"]`);
+      const element = document.querySelector(
+        `img[src*="https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png"]`
+      );
+
+      const parent = element?.closest("div")?.textContent.trim();
+      if (parent) {
+        data = parent.querySelector("div + div")?.textContent?.trim();
       }
-      return null;
-    };
+    });
 
-    // Lấy thông tin từ từng biểu tượng
-    const phone = getInfoByIcon(icons.phone);
-    const email = getInfoByIcon(icons.email);
-    const address = getInfoByIcon(icons.address);
-    const other = getInfoByIcon(icons.other);
-
-    return {
-      phone: phone || "Không tìm thấy số điện thoại",
-      email: email || "Không tìm thấy email",
-      address: address || "Không tìm thấy địa chỉ",
-      other: other || "Không tìm thấy thông tin cố định khác",
-    };
+    return data;
   });
 
   await browser.close();
