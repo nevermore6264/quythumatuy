@@ -31,8 +31,8 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
         const link = await searchGoogle(searchQuery); // Tìm kiếm link fanpage
 
-        // const details = link ? await getFanpageDetails(link) : {}; // Lấy thông tin từ fanpage nếu có
-        results.push({ searchQuery, link });
+        const details = link ? await getFanpageDetails(link) : null; // Lấy thông tin từ fanpage nếu có
+        results.push({ searchQuery, link, details });
       }
     }
 
@@ -92,22 +92,24 @@ async function searchGoogle(query) {
 
 // Lấy thông tin từ fanpage bằng Puppeteer
 async function getFanpageDetails(url) {
-  //   const browser = await puppeteer.launch();
-  //   const page = await browser.newPage();
-  //   await page.goto(url, { waitUntil: "load" });
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "networkidle2" });
 
-  //   const details = await page.evaluate(() => {
-  //     const phone = document.querySelector("[data-testid='phone']")?.textContent;
-  //     const email = document.querySelector("[data-testid='email']")?.textContent;
-  //     const address = document.querySelector(
-  //       "[data-testid='address']"
-  //     )?.textContent;
-  //     return { phone, email, address };
-  //   });
+  const details = await page.evaluate(() => {
+    const intro = document
+      .getElementsByClassName("html-div")[28]
+      .querySelector("ul");
+    // const phone = infor.querySelector("[data-testid='phone']")?.textContent;
+    // const email = infor.querySelector("[data-testid='email']")?.textContent;
+    // const address = infor.querySelector(
+    //   "[data-testid='address']"
+    // )?.textContent;
+    return intro?.textContent;
+  });
 
-  //   await browser.close();
-  //   return details;
-  return null;
+  await browser.close();
+  return details;
 }
 
 app.listen(3000, () =>
