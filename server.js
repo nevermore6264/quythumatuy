@@ -48,27 +48,46 @@ async function searchGoogle(query) {
   const apiKey = "AIzaSyBQzVfEynWjEksz59iqGkCNGxg03pmAJQ0";
   const cseId = "341005c8435be49e1";
 
-  const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
-    query
-  )}&cx=${cseId}&key=${apiKey}`;
+  // Hàm thực hiện truy vấn Google Custom Search
+  async function performSearch(q) {
+    const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+      q
+    )}&cx=${cseId}&key=${apiKey}&excludeTerms=story.php&as_sitesearch=facebook.com`;
 
-  try {
-    const response = await axios.get(url);
-    const searchResults = response.data.items;
+    try {
+      const response = await axios.get(url);
+      const searchResults = response.data.items;
 
-    // Lọc kết quả để lấy Facebook link
-    const facebookLink = searchResults
-      .map((item) => item.link)
-      .find(
-        (link) =>
-          link.startsWith("https://www.facebook.com") && !link.includes("posts")
-      );
+      // Lọc kết quả để lấy link Facebook hợp lệ
+      const facebookLinks = searchResults
+        .map((item) => item.link)
+        .filter(
+          (link) =>
+            link.startsWith("https://www.facebook.com") &&
+            !link.includes("posts") &&
+            !link.includes(".php") &&
+            !link.includes("photos") &&
+            !link.includes("photo") &&
+            !link.includes("rell")
+        );
 
-    return facebookLink || null;
-  } catch (error) {
-    console.error("Error searching Google:", error);
-    return null;
+      return facebookLinks[0] || null; // Trả về link đầu tiên hợp lệ hoặc null nếu không có
+    } catch (error) {
+      console.error("Error performing search:", error);
+      return null;
+    }
   }
+
+  // Tìm kiếm lần đầu với truy vấn ban đầu
+  let facebookLink = await performSearch(query);
+
+  // Nếu không có kết quả, thêm "Tuổi Trẻ" vào trước truy vấn và tìm kiếm lại
+  if (!facebookLink) {
+    facebookLink = await performSearch(`Tuổi Trẻ ${query}`);
+  }
+
+  // Trả về kết quả cuối cùng (hoặc null nếu không tìm thấy sau cả hai lần tìm kiếm)
+  return facebookLink || "-";
 }
 
 // Lấy thông tin từ fanpage bằng Puppeteer
