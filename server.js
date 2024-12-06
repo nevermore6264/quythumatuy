@@ -9,6 +9,7 @@ const upload = multer({ dest: "uploads/" });
 const cors = require("cors");
 app.use(cors());
 const path = require("path");
+const axios = require("axios");
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -44,36 +45,30 @@ app.post("/process", upload.single("file"), async (req, res) => {
 });
 
 async function searchGoogle(query) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
+  const apiKey = "AIzaSyBQzVfEynWjEksz59iqGkCNGxg03pmAJQ0";
+  const cseId = "341005c8435be49e1";
 
-  const url = `https://www.google.com/search?q=${query.replace(
-    / /g,
-    "+"
-  )}&as_sitesearch=https%3A%2F%2Fwww.facebook.com%2F&sourceid=chrome&ie=UTF-8`;
-  console.log("url: ", url);
+  const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+    query
+  )}&cx=${cseId}&key=${apiKey}`;
 
-  await page.goto(url, { waitUntil: "networkidle2" }); // Đợi trang tải xong
+  try {
+    const response = await axios.get(url);
+    const searchResults = response.data.items;
 
-  // Đợi các phần tử có thể chứa kết quả tìm kiếm
-  await page.waitForSelector("a");
-
-  // Lọc và lấy link đầu tiên có dạng "https://www.facebook.com" mà không chứa từ "posts"
-  const link = await page.evaluate(() => {
-    const anchors = Array.from(document.querySelectorAll("a"));
-    const facebookLink = anchors
-      .map((a) => a.href)
+    // Lọc kết quả để lấy Facebook link
+    const facebookLink = searchResults
+      .map((item) => item.link)
       .find(
-        (href) =>
-          href.startsWith("https://www.facebook.com") && !href.includes("posts")
+        (link) =>
+          link.startsWith("https://www.facebook.com") && !link.includes("posts")
       );
 
-    return facebookLink || null; // Trả về link đầu tiên hợp lệ hoặc null nếu không có
-  });
-
-  await browser.close();
-  console.log(link);
-  return link;
+    return facebookLink || null;
+  } catch (error) {
+    console.error("Error searching Google:", error);
+    return null;
+  }
 }
 
 // Lấy thông tin từ fanpage bằng Puppeteer
