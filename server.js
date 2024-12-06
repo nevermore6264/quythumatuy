@@ -43,40 +43,38 @@ app.post("/process", upload.single("file"), async (req, res) => {
   }
 });
 
-const searchGoogle = async (query) => {
-  // Mở trình duyệt mới bằng Puppeteer.
+async function searchGoogle(query) {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
-  // Điều hướng đến trang web với số trang thay đổi.
   const url = `https://www.google.com/search?q=${query.replace(
     / /g,
     "+"
   )}&as_sitesearch=https%3A%2F%2Fwww.facebook.com%2F&sourceid=chrome&ie=UTF-8`;
   console.log("url: ", url);
-  await page.goto(url);
 
-  // Chờ phần tử chứa danh sách truyện cười tải.
-  await page.waitForSelector("#search");
+  await page.goto(url, { waitUntil: "networkidle2" }); // Đợi trang tải xong
 
-  // Lấy dữ liệu truyện cười từ trang hiện tại.
-  const stories = await page.evaluate(() => {
+  // Đợi các phần tử có thể chứa kết quả tìm kiếm
+  await page.waitForSelector("a");
+
+  // Lọc và lấy link đầu tiên có dạng "https://www.facebook.com" mà không chứa từ "posts"
+  const link = await page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll("a"));
     const facebookLink = anchors
       .map((a) => a.href)
-      .filter(
+      .find(
         (href) =>
           href.startsWith("https://www.facebook.com") && !href.includes("posts")
       );
 
-    return facebookLink[0] || null; // Trả về link đầu tiên hoặc null nếu không có
+    return facebookLink || null; // Trả về link đầu tiên hợp lệ hoặc null nếu không có
   });
 
-  // Đóng trình duyệt.
   await browser.close();
-
-  console.log(stories);
-};
+  console.log(link);
+  return link;
+}
 
 // Lấy thông tin từ fanpage bằng Puppeteer
 async function getFanpageDetails(url) {
