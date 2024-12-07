@@ -42,14 +42,12 @@ app.post("/process", upload.single("file"), async (req, res) => {
         console.log(">>>>>>>>", searchQuery);
 
         const link = await searchGoogle(searchQuery); // Search Google for Facebook link
-        // const details = await getFanpageDetails(link);
-        const details = null;
-        // // Append the details and link to the current row
-        // row[5] = link; // Column F for Facebook link
-        // row[6] = details.phone; // Column G for phone
-        // row[7] = details.phone; // Column H for phone
-        // row[8] = details.email; // Column I for email
-        // row[9] = details.address; // Column J for address
+        const details = await getFanpageDetails(link);
+        row[5] = link; // Column F for Facebook link
+        row[6] = details.phone; // Column G for phone
+        row[7] = details.phone; // Column H for phone
+        row[8] = details.email; // Column I for email
+        row[9] = details.address; // Column J for address
 
         results.push({ searchQuery, link, details });
       }
@@ -131,9 +129,9 @@ async function getFanpageDetails(url) {
     Object.keys(icons).forEach((key) => {
       const element = document.querySelector(`img[src*="${icons[key]}"]`);
       const parent = element?.closest("div + div");
-      const value = parent?.textContent?.trim();
-      // Nếu là key "phone", loại bỏ khoảng trắng giữa các số
-      if (key === "phone") {
+      let value = parent?.textContent?.trim() || "-";
+
+      if (key === "phone" && typeof value === "string") {
         value = value.replace(/\s+/g, "");
       }
 
