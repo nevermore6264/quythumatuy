@@ -3,44 +3,76 @@ const multer = require("multer");
 const xlsx = require("xlsx");
 const puppeteer = require("puppeteer");
 const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
 const cors = require("cors");
 app.use(cors());
-const path = require("path");
-const axios = require("axios");
-
 app.use(express.static(path.join(__dirname, "public")));
 
 app.post("/process", upload.single("file"), async (req, res) => {
   try {
-    const filePath = req.file.path; // Đường dẫn file Excel được tải lên
+    const filePath = req.file.path; // File path of uploaded Excel
     const workbook = xlsx.readFile(filePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i]; // Lấy từng dòng
-      const searchQuery = row[4]; // Cột E tương ứng với index 4 (bắt đầu từ 0)
+    const logData = []; // To hold the data we want to log or save
 
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i]; // Access each row in the Excel sheet
+      const searchQuery = row[4]; // Column E, index 4
+
+      // Capture the data from columns F (5), I (8), K (10), and L (11)
+      const columnF = row[5] || "-"; // Column F
+      const columnI = row[8] || "-"; // Column I
+      const columnK = row[10] || "-"; // Column K
+      const columnL = row[11] || "-"; // Column L
+
+      // Save this data to logData
+      logData.push([columnF, columnI, columnK, columnL]);
+
+      // Check if searchQuery starts with "Công an"
       if (searchQuery && searchQuery.startsWith("Công an")) {
         console.log(">>>>>>>>", searchQuery);
 
-        const link = await searchGoogle(searchQuery); // Tìm kiếm link fanpage
+        const link = await searchGoogle(searchQuery); // Search Google for Facebook link
+        const details = link
+          ? await getFanpageDetails(link)
+          : { phone: "-", email: "-", address: "-" };
 
-        const details = link ? await getFanpageDetails(link) : null; // Lấy thông tin từ fanpage nếu có
+        // Append the details and link to the current row
+        row[5] = link; // Column F for Facebook link
+        row[6] = details.phone; // Column G for phone
+        row[7] = details.phone; // Column G for phone
+        row[8] = details.email; // Column H for email
+        row[9] = details.address; // Column I for address
+
         results.push({ searchQuery, link, details });
       }
     }
 
-    fs.unlinkSync(filePath); // Xóa file sau khi xử lý
-    res.json(results); // Trả kết quả về client
+    // Tạo một worksheet mới với dữ liệu đã cập nhật
+    const updatedWorksheet = xlsx.utils.aoa_to_sheet(data);
+    xlsx.utils.book_append_sheet(workbook, updatedWorksheet, "Updated Data");
+
+    // Lưu tệp Excel mới
+    const updatedFilePath = path.join(
+      __dirname,
+      "uploads",
+      `updated_data_${Date.now()}.xlsx`
+    );
+    xlsx.writeFile(workbook, updatedFilePath);
+
+    fs.unlinkSync(filePath); // Xóa tệp Excel ban đầu sau khi xử lý
+    res.json({ results, updatedFilePath }); // Trả về đường dẫn tệp đã cập nhật
   } catch (error) {
     console.error(error);
-    res.status(500).send("Đã xảy ra lỗi");
+    res.status(500).send("An error occurred");
   }
 });
 
@@ -48,7 +80,6 @@ async function searchGoogle(query) {
   const apiKey = "AIzaSyBQzVfEynWjEksz59iqGkCNGxg03pmAJQ0";
   const cseId = "341005c8435be49e1";
 
-  // Hàm thực hiện truy vấn Google Custom Search
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
       q
@@ -58,7 +89,6 @@ async function searchGoogle(query) {
       const response = await axios.get(url);
       const searchResults = response.data.items;
 
-      // Lọc kết quả để lấy link Facebook hợp lệ
       const facebookLinks = searchResults
         .map((item) => item.link)
         .filter(
@@ -71,51 +101,44 @@ async function searchGoogle(query) {
             !link.includes("rell")
         );
 
-      return facebookLinks[0] || null; // Trả về link đầu tiên hợp lệ hoặc null nếu không có
+      return facebookLinks[0] || null;
     } catch (error) {
       console.error("Error performing search:", error);
       return null;
     }
   }
 
-  // Tìm kiếm lần đầu với truy vấn ban đầu
   let facebookLink = await performSearch(query);
-
-  // Nếu không có kết quả, thêm "Tuổi Trẻ" vào trước truy vấn và tìm kiếm lại
   if (!facebookLink) {
     facebookLink = await performSearch(`Tuổi Trẻ ${query}`);
   }
 
-  // Trả về kết quả cuối cùng (hoặc null nếu không tìm thấy sau cả hai lần tìm kiếm)
   return facebookLink || "-";
 }
 
-// Hàm lấy thông tin từ fanpage
 async function getFanpageDetails(url) {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: "networkidle2" });
 
-  // Lấy dữ liệu từ các biểu tượng
   const details = await page.evaluate(() => {
     const data = {};
     const icons = {
-      // phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
-      // email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
+      phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yT/r/Dc7-7AgwkwS.png",
+      email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
       address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
     };
 
     Object.keys(icons).forEach((key) => {
-      const element = document.querySelector(`img[src*="${icons[key]}"]`);
-      // const element = document.querySelector(
-      //   `img[src*="https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png"]`
-      // );
-
-      const parent = element.closest("div");
-      const value = parent?.querySelector("div + div")?.textContent?.trim();
-      if (value) {
-        data[key] = value;
+      const element = document.querySelector(img[(src *= "${icons[key]}")]);
+      const parent = element?.closest("div + div");
+      const value = parent?.textContent?.trim();
+      // Nếu là key "phone", loại bỏ khoảng trắng giữa các số
+      if (key === "phone") {
+        value = value.replace(/\s+/g, "");
       }
+
+      data[key] = value;
     });
 
     return data;
