@@ -16,11 +16,12 @@ document.getElementById("processBtn").addEventListener("click", async () => {
       body: formData,
     });
     const data = await response.json();
-    document.getElementById("output").textContent = JSON.stringify(
-      data,
-      null,
-      2
-    );
+    document.getElementById("output").textContent = "Done";
+    // document.getElementById("output").textContent = JSON.stringify(
+    //   data,
+    //   null,
+    //   2
+    // );
   } catch (error) {
     document.getElementById("output").textContent =
       "Đã xảy ra lỗi: " + error.message;

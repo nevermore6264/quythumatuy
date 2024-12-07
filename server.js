@@ -27,7 +27,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
       const searchQuery = row[1]; // Column E, index 4
 
       if (searchQuery && searchQuery.startsWith("Công an")) {
-        console.log("Processing Công an:", searchQuery);
+        console.log(`Row ${i}: Processing Công an - ${searchQuery}`);
 
         const link = await searchGoogle(searchQuery); // Search Facebook link
         const details =
@@ -45,13 +45,14 @@ app.post("/process", upload.single("file"), async (req, res) => {
         row[6] = details.address || "-"; // Column G: Address
 
         // Update Column E with the link as a clickable hyperlink in Excel
-        row[1] = link
-          ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
-          : searchQuery;
+        row[1] =
+          link && link !== "-"
+            ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+            : searchQuery;
 
         results.push({ searchQuery, link, details });
       } else if (searchQuery && searchQuery.includes("UBND")) {
-        console.log("Processing UBND:", searchQuery);
+        console.log(`Row ${i}: Processing UBND - ${searchQuery}`);
 
         const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
 
@@ -62,9 +63,10 @@ app.post("/process", upload.single("file"), async (req, res) => {
         row[6] = "-"; // Column G: ĐỊA CHỈ
 
         // Update Column E with the link as a clickable hyperlink in Excel
-        row[1] = link
-          ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
-          : searchQuery;
+        row[1] =
+          link && link !== "-"
+            ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+            : searchQuery;
 
         results.push({ searchQuery, link });
       }
