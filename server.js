@@ -27,19 +27,35 @@ app.post("/process", upload.single("file"), async (req, res) => {
       const searchQuery = row[4]; // Column E, index 4
 
       if (searchQuery && searchQuery.startsWith("Công an")) {
-        console.log(">>>>>>>>", searchQuery);
+        console.log("Processing Công an:", searchQuery);
 
-        const link = await searchGoogle(searchQuery); // Search Google for Facebook link
+        const link = await searchGoogle(searchQuery); // Search Facebook link
         const details = link
           ? await getFanpageDetails(link)
           : { phone: "-", email: "-", address: "-" };
 
-        // Update data into specific columns
+        // Update data vào các cột tương ứng
         row[5] = link || "-"; // Column F: Facebook link
         row[6] = details.phone || "-"; // Column G: Phone
         row[7] = details.phone || "-"; // Column H: Phone
         row[8] = details.email || "-"; // Column I: Email
         row[9] = details.address || "-"; // Column J: Address
+
+        results.push({ searchQuery, link, details });
+      } else if (searchQuery && searchQuery.includes("UBND")) {
+        console.log("Processing UBND:", searchQuery);
+
+        const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
+        const details = link
+          ? await getFooterDetails(link) // Trích xuất từ footer
+          : { phone: "-", email: "-", address: "-" };
+
+        // Update data vào các cột tương ứng
+        row[5] = link || "-"; // Column F: GOV link
+        row[6] = details.phone || "-"; // Column G: CỐ ĐỊNH
+        row[7] = details.phone || "-"; // Column H: DI ĐỘNG
+        row[8] = details.email || "-"; // Column I: EMAIL
+        row[9] = details.address || "-"; // Column J: ĐỊA CHỈ
 
         results.push({ searchQuery, link, details });
       }
@@ -70,6 +86,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
   }
 });
 
+// Hàm tìm kiếm Facebook link
 async function searchGoogle(query) {
   const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
   const cseId = "341005c8435be49e1";
@@ -78,7 +95,6 @@ async function searchGoogle(query) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
       q
     )}&cx=${cseId}&key=${apiKey}&excludeTerms=story.php&as_sitesearch=facebook.com`;
-    console.log(url);
     try {
       const response = await axios.get(url);
       const searchResults = response.data.items;
@@ -110,6 +126,35 @@ async function searchGoogle(query) {
   return facebookLink || "-";
 }
 
+// Hàm tìm kiếm GOV link
+async function searchGoogleWithGov(query) {
+  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
+  const cseId = "341005c8435be49e1";
+
+  async function performSearch(q) {
+    const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
+      q
+    )}&cx=${cseId}&key=${apiKey}&siteSearch=gov.vn`;
+    console.log(url);
+    try {
+      const response = await axios.get(url);
+      const searchResults = response.data.items;
+
+      const govLinks = searchResults
+        .map((item) => item.link)
+        .filter((link) => link.includes(".gov.vn"));
+
+      return govLinks[0] || null;
+    } catch (error) {
+      console.error("Error performing search:", error);
+      return null;
+    }
+  }
+
+  return await performSearch(query);
+}
+
+// Hàm thu thập thông tin fanpage
 async function getFanpageDetails(url) {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
@@ -140,6 +185,48 @@ async function getFanpageDetails(url) {
 
   await browser.close();
   return details;
+}
+
+async function getFooterDetails(url) {
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+
+  try {
+    // Thiết lập User-Agent để tránh bị chặn
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    );
+
+    // Tăng thời gian chờ và tải trang
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+
+    // Trích xuất thông tin từ thẻ footer
+    const details = await page.evaluate(() => {
+      const footer = document.getElementById("footer");
+      if (!footer) {
+        return { phone: "-", email: "-", address: "-" }; // Nếu không tìm thấy footer
+      }
+
+      const textContent = footer.textContent || ""; // Lấy toàn bộ nội dung văn bản
+      const result = {
+        address: (textContent.match(/Địa chỉ: (.+?)(\n|$)/) || [])[1] || "-", // Lọc địa chỉ
+        phone: (textContent.match(/Điện thoại: (.+?)(\n|$)/) || [])[1] || "-", // Lọc điện thoại
+        email:
+          (textContent.match(
+            /\b[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9.-]+\.)?hanoi\.gov\.vn\b/
+          ) || [])[1] || "-", // Lọc email
+      };
+
+      return result;
+    });
+
+    return details;
+  } catch (error) {
+    console.error("Error scraping footer details:", error);
+    return { phone: "-", email: "-", address: "-" };
+  } finally {
+    await browser.close();
+  }
 }
 
 app.listen(3000, () =>
