@@ -33,15 +33,15 @@ app.post("/process", upload.single("file"), async (req, res) => {
         const details = link
           ? await getFanpageDetails(link)
           : { phone: "-", email: "-", address: "-" };
-
+        console.log(details);
         row[2] = link || "-"; // Column F: Facebook link
         row[3] =
-          phoneDetails.type === "Mobile"
-            ? normalizePhoneNumber(phoneDetails.phone)
+          details.type === "Mobile"
+            ? normalizePhoneNumber(details.phone).phone
             : "-"; // Column D: DI ĐỘNG
         row[4] =
-          phoneDetails.type === "Landline"
-            ? normalizePhoneNumber(phoneDetails.phone)
+          details.type === "Landline"
+            ? normalizePhoneNumber(details.phone).phone
             : "-"; // Column E: CỐ ĐỊNH
         row[5] = details.email || "-"; // Column F: Email
         row[6] = details.address || "-"; // Column G: Address
@@ -146,7 +146,6 @@ async function searchGoogleWithGov(query) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
       q
     )}&cx=${cseId}&key=${apiKey}&siteSearch=gov.vn`;
-    console.log(url);
     try {
       const response = await axios.get(url);
       const searchResults = response.data.items;
@@ -231,6 +230,73 @@ function normalizePhoneNumber(rawPhone) {
     "0164": "034",
     "0163": "033",
     "0162": "032",
+
+    // Mã vùng cũ và mã vùng mới Miền Bắc
+    "0240": "0204",
+    "0281": "0209",
+    "0241": "0222",
+    "026": "0206",
+    "0230": "0215",
+    "0219": "0219",
+    "0351": "0226",
+    "04": "024",
+    "039": "0239",
+    "0320": "0220",
+    "031": "0225",
+    "0218": "0218",
+    "0321": "0221",
+    "0231": "0213",
+    "025": "0205",
+    "020": "0214",
+    "0350": "0228",
+    "030": "0229",
+    "038": "0238",
+    "0210": "0210",
+    "052": "0232",
+    "033": "0203",
+    "053": "0233",
+    "022": "0212",
+    "027": "0207",
+    "036": "0227",
+    "0280": "0208",
+    "037": "0237",
+    "054": "0234",
+    "0211": "0211",
+    "029": "0216",
+
+    // Mã vùng mới Miền Nam
+    "076": "0296",
+    "064": "0254",
+    "0781": "0291",
+    "075": "0275",
+    "0650": "0274",
+    "056": "0256",
+    "0651": "0271",
+    "062": "0252",
+    "0780": "0290",
+    "0710": "0292",
+    "0511": "0236",
+    "0500": "0262",
+    "0501": "0261",
+    "061": "0251",
+    "067": "0277",
+    "059": "0269",
+    "0711": "0293",
+    "08": "028",
+    "077": "0297",
+    "060": "0260",
+    "058": "0258",
+    "063": "0263",
+    "072": "0272",
+    "068": "0259",
+    "057": "0257",
+    "0510": "0235",
+    "055": "0255",
+    "079": "0299",
+    "066": "0276",
+    "073": "0273",
+    "074": "0294",
+    "070": "0270",
   };
 
   Object.keys(carrierMap).forEach((oldPrefix) => {
