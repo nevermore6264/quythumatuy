@@ -28,29 +28,28 @@ app.post("/process", upload.single("file"), async (req, res) => {
       const searchQuery = row[4]; // Column E, index 4
 
       // Capture the data from columns F (5), I (8), K (10), and L (11)
-      const columnF = row[5] || "-"; // Column F
-      const columnI = row[8] || "-"; // Column I
-      const columnK = row[10] || "-"; // Column K
-      const columnL = row[11] || "-"; // Column L
+      const columnF = row[5] || "-";
+      const columnG = row[6] || "-";
+      const columnH = row[7] || "-";
+      const columnI = row[11] || "-";
+      const columnJ = row[11] || "-";
 
       // Save this data to logData
-      logData.push([columnF, columnI, columnK, columnL]);
+      logData.push([columnF, columnG, columnH, columnI, columnJ]);
 
       // Check if searchQuery starts with "Công an"
       if (searchQuery && searchQuery.startsWith("Công an")) {
         console.log(">>>>>>>>", searchQuery);
 
         const link = await searchGoogle(searchQuery); // Search Google for Facebook link
-        const details = link
-          ? await getFanpageDetails(link)
-          : { phone: "-", email: "-", address: "-" };
-
-        // Append the details and link to the current row
-        row[5] = link; // Column F for Facebook link
-        row[6] = details.phone; // Column G for phone
-        row[7] = details.phone; // Column G for phone
-        row[8] = details.email; // Column H for email
-        row[9] = details.address; // Column I for address
+        // const details = await getFanpageDetails(link);
+        const details = null;
+        // // Append the details and link to the current row
+        // row[5] = link; // Column F for Facebook link
+        // row[6] = details.phone; // Column G for phone
+        // row[7] = details.phone; // Column H for phone
+        // row[8] = details.email; // Column I for email
+        // row[9] = details.address; // Column J for address
 
         results.push({ searchQuery, link, details });
       }
@@ -77,14 +76,14 @@ app.post("/process", upload.single("file"), async (req, res) => {
 });
 
 async function searchGoogle(query) {
-  const apiKey = "AIzaSyBQzVfEynWjEksz59iqGkCNGxg03pmAJQ0";
+  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
   const cseId = "341005c8435be49e1";
 
   async function performSearch(q) {
-    const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+    const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
       q
     )}&cx=${cseId}&key=${apiKey}&excludeTerms=story.php&as_sitesearch=facebook.com`;
-
+    console.log(url);
     try {
       const response = await axios.get(url);
       const searchResults = response.data.items;
@@ -130,7 +129,7 @@ async function getFanpageDetails(url) {
     };
 
     Object.keys(icons).forEach((key) => {
-      const element = document.querySelector(img[(src *= "${icons[key]}")]);
+      const element = document.querySelector(`img[src*="${icons[key]}"]`);
       const parent = element?.closest("div + div");
       const value = parent?.textContent?.trim();
       // Nếu là key "phone", loại bỏ khoảng trắng giữa các số
