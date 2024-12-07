@@ -21,52 +21,49 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
-    const logData = []; // To hold the data we want to log or save
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i]; // Access each row in the Excel sheet
       const searchQuery = row[4]; // Column E, index 4
 
-      // Capture the data from columns F (5), I (8), K (10), and L (11)
-      const columnF = row[5] || "-";
-      const columnG = row[6] || "-";
-      const columnH = row[7] || "-";
-      const columnI = row[11] || "-";
-      const columnJ = row[11] || "-";
-
-      // Save this data to logData
-      logData.push([columnF, columnG, columnH, columnI, columnJ]);
-
-      // Check if searchQuery starts with "Công an"
       if (searchQuery && searchQuery.startsWith("Công an")) {
         console.log(">>>>>>>>", searchQuery);
 
         const link = await searchGoogle(searchQuery); // Search Google for Facebook link
-        const details = await getFanpageDetails(link);
-        row[5] = link; // Column F for Facebook link
-        row[6] = details.phone; // Column G for phone
-        row[7] = details.phone; // Column H for phone
-        row[8] = details.email; // Column I for email
-        row[9] = details.address; // Column J for address
+        const details = link
+          ? await getFanpageDetails(link)
+          : { phone: "-", email: "-", address: "-" };
+
+        // Update data into specific columns
+        row[5] = link || "-"; // Column F: Facebook link
+        row[6] = details.phone || "-"; // Column G: Phone
+        row[7] = details.phone || "-"; // Column H: Phone
+        row[8] = details.email || "-"; // Column I: Email
+        row[9] = details.address || "-"; // Column J: Address
 
         results.push({ searchQuery, link, details });
       }
     }
 
-    // Tạo một worksheet mới với dữ liệu đã cập nhật
+    // Create updated worksheet with modified data
     const updatedWorksheet = xlsx.utils.aoa_to_sheet(data);
-    xlsx.utils.book_append_sheet(workbook, updatedWorksheet, "Updated Data");
+    const updatedWorkbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(
+      updatedWorkbook,
+      updatedWorksheet,
+      "Updated Data"
+    );
 
-    // Lưu tệp Excel mới
+    // Save the updated Excel file
     const updatedFilePath = path.join(
       __dirname,
       "uploads",
       `updated_data_${Date.now()}.xlsx`
     );
-    xlsx.writeFile(workbook, updatedFilePath);
+    xlsx.writeFile(updatedWorkbook, updatedFilePath);
 
-    fs.unlinkSync(filePath); // Xóa tệp Excel ban đầu sau khi xử lý
-    res.json({ results, updatedFilePath }); // Trả về đường dẫn tệp đã cập nhật
+    fs.unlinkSync(filePath); // Delete original Excel file after processing
+    res.json({ results, updatedFilePath }); // Return the updated file path
   } catch (error) {
     console.error(error);
     res.status(500).send("An error occurred");
