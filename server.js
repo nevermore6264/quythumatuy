@@ -34,7 +34,6 @@ app.post("/process", upload.single("file"), async (req, res) => {
           ? await getFanpageDetails(link)
           : { phone: "-", email: "-", address: "-" };
 
-        // Update data vào các cột tương ứng
         row[5] = link || "-"; // Column F: Facebook link
         row[6] = details.phone || "-"; // Column G: Phone
         row[7] = details.phone || "-"; // Column H: Phone
@@ -46,16 +45,12 @@ app.post("/process", upload.single("file"), async (req, res) => {
         console.log("Processing UBND:", searchQuery);
 
         const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
-        const details = link
-          ? await getFooterDetails(link) // Trích xuất từ footer
-          : { phone: "-", email: "-", address: "-" };
 
-        // Update data vào các cột tương ứng
         row[5] = link || "-"; // Column F: GOV link
-        row[6] = details.phone || "-"; // Column G: CỐ ĐỊNH
-        row[7] = details.phone || "-"; // Column H: DI ĐỘNG
-        row[8] = details.email || "-"; // Column I: EMAIL
-        row[9] = details.address || "-"; // Column J: ĐỊA CHỈ
+        row[6] = "-"; // Column G: CỐ ĐỊNH
+        row[7] = "-"; // Column H: DI ĐỘNG
+        row[8] = "-"; // Column I: EMAIL
+        row[9] = "-"; // Column J: ĐỊA CHỈ
 
         results.push({ searchQuery, link, details });
       }
@@ -185,48 +180,6 @@ async function getFanpageDetails(url) {
 
   await browser.close();
   return details;
-}
-
-async function getFooterDetails(url) {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-
-  try {
-    // Thiết lập User-Agent để tránh bị chặn
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    );
-
-    // Tăng thời gian chờ và tải trang
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-
-    // Trích xuất thông tin từ thẻ footer
-    const details = await page.evaluate(() => {
-      const footer = document.getElementById("footer");
-      if (!footer) {
-        return { phone: "-", email: "-", address: "-" }; // Nếu không tìm thấy footer
-      }
-
-      const textContent = footer.textContent || ""; // Lấy toàn bộ nội dung văn bản
-      const result = {
-        address: (textContent.match(/Địa chỉ: (.+?)(\n|$)/) || [])[1] || "-", // Lọc địa chỉ
-        phone: (textContent.match(/Điện thoại: (.+?)(\n|$)/) || [])[1] || "-", // Lọc điện thoại
-        email:
-          (textContent.match(
-            /\b[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9.-]+\.)?hanoi\.gov\.vn\b/
-          ) || [])[1] || "-", // Lọc email
-      };
-
-      return result;
-    });
-
-    return details;
-  } catch (error) {
-    console.error("Error scraping footer details:", error);
-    return { phone: "-", email: "-", address: "-" };
-  } finally {
-    await browser.close();
-  }
 }
 
 app.listen(3000, () =>
