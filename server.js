@@ -30,9 +30,10 @@ app.post("/process", upload.single("file"), async (req, res) => {
         console.log("Processing Công an:", searchQuery);
 
         const link = await searchGoogle(searchQuery); // Search Facebook link
-        const details = link
-          ? await getFanpageDetails(link)
-          : { phone: "-", email: "-", address: "-" };
+        const details =
+          link && link !== "-"
+            ? await getFanpageDetails(link)
+            : { phone: "-", email: "-", address: "-" };
 
         row[2] = link || "-"; // Column F: Facebook link
 
