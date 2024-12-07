@@ -35,8 +35,8 @@ app.post("/process", upload.single("file"), async (req, res) => {
           : { phone: "-", email: "-", address: "-" };
 
         row[5] = link || "-"; // Column F: Facebook link
-        row[6] = details.phone || "-"; // Column G: Phone
-        row[7] = details.phone || "-"; // Column H: Phone
+        row[6] = normalizePhoneNumber(details.phone) || "-"; // Column G: Phone
+        row[7] = normalizePhoneNumber(details.phone) || "-"; // Column H: Phone
         row[8] = details.email || "-"; // Column I: Email
         row[9] = details.address || "-"; // Column J: Address
 
@@ -168,10 +168,6 @@ async function getFanpageDetails(url) {
       const parent = element?.closest("div + div");
       let value = parent?.textContent?.trim() || "-";
 
-      if (key === "phone" && typeof value === "string") {
-        value = value.replace(/\s+/g, "");
-      }
-
       data[key] = value;
     });
 
@@ -180,6 +176,58 @@ async function getFanpageDetails(url) {
 
   await browser.close();
   return details;
+}
+
+function normalizePhoneNumber(rawPhone) {
+  if (!rawPhone) return null; // Không có số trả về null
+
+  // 1. Loại bỏ các ký tự không cần thiết
+  let phone = rawPhone.replace(/[\s()-]/g, ""); // Xóa khoảng trắng, dấu ngoặc, gạch ngang
+
+  // 2. Chuyển đổi đầu số quốc tế (+84 hoặc 84) thành 0
+  phone = phone.replace(/^(\+84|84)/, "0");
+
+  // 3. Xử lý số điện thoại của các nhà mạng với đầu số cũ
+  const carrierMap = {
+    // MOBIFONE
+    "0120": "070",
+    "0121": "079",
+    "0122": "077",
+    "0126": "076",
+    "0128": "078",
+    // GMOBILE
+    "0199": "059",
+    // VIETNAMOBILE
+    "0186": "056",
+    "0188": "058",
+    // VINAPHONE
+    "0123": "083",
+    "0124": "084",
+    "0125": "085",
+    "0127": "081",
+    "0129": "082",
+    // VIETTEL
+    "0169": "039",
+    "0168": "038",
+    "0167": "037",
+    "0166": "036",
+    "0165": "035",
+    "0164": "034",
+    "0163": "033",
+    "0162": "032",
+  };
+
+  Object.keys(carrierMap).forEach((oldPrefix) => {
+    const regex = new RegExp(`^0${oldPrefix}`);
+    if (regex.test(phone)) {
+      phone = phone.replace(regex, `0${carrierMap[oldPrefix]}`);
+    }
+  });
+
+  // 4. Kiểm tra số điện thoại hợp lệ (10 hoặc 11 chữ số)
+  if (/^0\d{9,10}$/.test(phone)) {
+    return phone;
+  }
 }
 
 app.listen(3000, () =>
