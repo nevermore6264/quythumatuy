@@ -24,7 +24,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i]; // Access each row in the Excel sheet
-      const searchQuery = row[4]; // Column E, index 4
+      const searchQuery = row[1]; // Column E, index 4
 
       if (searchQuery && searchQuery.startsWith("Công an")) {
         console.log("Processing Công an:", searchQuery);
@@ -34,11 +34,16 @@ app.post("/process", upload.single("file"), async (req, res) => {
           ? await getFanpageDetails(link)
           : { phone: "-", email: "-", address: "-" };
 
-        row[5] = link || "-"; // Column F: Facebook link
-        row[6] = normalizePhoneNumber(details.phone) || "-"; // Column G: Phone
-        row[7] = normalizePhoneNumber(details.phone) || "-"; // Column H: Phone
-        row[8] = details.email || "-"; // Column I: Email
-        row[9] = details.address || "-"; // Column J: Address
+        row[2] = link || "-"; // Column F: Facebook link
+        row[3] = normalizePhoneNumber(details.phone) || "-"; // Column G: Phone
+        row[4] = normalizePhoneNumber(details.phone) || "-"; // Column H: Phone
+        row[5] = details.email || "-"; // Column I: Email
+        row[6] = details.address || "-"; // Column J: Address
+
+        // Update Column E with the link as a clickable hyperlink in Excel
+        row[1] = link
+          ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+          : searchQuery;
 
         results.push({ searchQuery, link, details });
       } else if (searchQuery && searchQuery.includes("UBND")) {
@@ -46,13 +51,18 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
         const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
 
-        row[5] = link || "-"; // Column F: GOV link
-        row[6] = "-"; // Column G: CỐ ĐỊNH
-        row[7] = "-"; // Column H: DI ĐỘNG
-        row[8] = "-"; // Column I: EMAIL
-        row[9] = "-"; // Column J: ĐỊA CHỈ
+        row[2] = link || "-"; // Column F: GOV link
+        row[3] = "-"; // Column G: CỐ ĐỊNH
+        row[4] = "-"; // Column H: DI ĐỘNG
+        row[5] = "-"; // Column I: EMAIL
+        row[6] = "-"; // Column J: ĐỊA CHỈ
 
-        results.push({ searchQuery, link, details });
+        // Update Column E with the link as a clickable hyperlink in Excel
+        row[1] = link
+          ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+          : searchQuery;
+
+        results.push({ searchQuery, link });
       }
     }
 
