@@ -35,10 +35,16 @@ app.post("/process", upload.single("file"), async (req, res) => {
           : { phone: "-", email: "-", address: "-" };
 
         row[2] = link || "-"; // Column F: Facebook link
-        row[3] = normalizePhoneNumber(details.phone) || "-"; // Column G: Phone
-        row[4] = normalizePhoneNumber(details.phone) || "-"; // Column H: Phone
-        row[5] = details.email || "-"; // Column I: Email
-        row[6] = details.address || "-"; // Column J: Address
+        row[3] =
+          phoneDetails.type === "Mobile"
+            ? normalizePhoneNumber(phoneDetails.phone)
+            : "-"; // Column D: DI ĐỘNG
+        row[4] =
+          phoneDetails.type === "Landline"
+            ? normalizePhoneNumber(phoneDetails.phone)
+            : "-"; // Column E: CỐ ĐỊNH
+        row[5] = details.email || "-"; // Column F: Email
+        row[6] = details.address || "-"; // Column G: Address
 
         // Update Column E with the link as a clickable hyperlink in Excel
         row[1] = link
@@ -51,11 +57,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
         const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
 
-        row[2] = link || "-"; // Column F: GOV link
-        row[3] = "-"; // Column G: CỐ ĐỊNH
-        row[4] = "-"; // Column H: DI ĐỘNG
-        row[5] = "-"; // Column I: EMAIL
-        row[6] = "-"; // Column J: ĐỊA CHỈ
+        row[2] = link || "-"; // Column C: GOV link
+        row[3] = "-"; // Column D: DI ĐỘNG
+        row[4] = "-"; // Column E: CỐ ĐỊNH
+        row[5] = "-"; // Column F: EMAIL
+        row[6] = "-"; // Column G: ĐỊA CHỈ
 
         // Update Column E with the link as a clickable hyperlink in Excel
         row[1] = link
@@ -234,9 +240,37 @@ function normalizePhoneNumber(rawPhone) {
     }
   });
 
-  // 4. Kiểm tra số điện thoại hợp lệ (10 hoặc 11 chữ số)
-  if (/^0\d{9,10}$/.test(phone)) {
-    return phone;
+  const mobilePrefixes = [
+    "070",
+    "079",
+    "077",
+    "076",
+    "078",
+    "083",
+    "084",
+    "085",
+    "081",
+    "082",
+    "039",
+    "038",
+    "037",
+    "036",
+    "035",
+    "034",
+    "033",
+    "032",
+    "056",
+    "058",
+    "059",
+  ];
+  // Kiểm tra nếu là số di động
+  const isMobile = mobilePrefixes.some((prefix) => phone.startsWith(prefix));
+
+  // Nếu là số di động
+  if (isMobile) {
+    return { phone: phone, type: "Mobile" };
+  } else {
+    return { phone: phone, type: "Landline" };
   }
 }
 
