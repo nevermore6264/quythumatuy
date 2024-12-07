@@ -33,16 +33,13 @@ app.post("/process", upload.single("file"), async (req, res) => {
         const details = link
           ? await getFanpageDetails(link)
           : { phone: "-", email: "-", address: "-" };
-        console.log(details);
+
         row[2] = link || "-"; // Column F: Facebook link
-        row[3] =
-          details.type === "Mobile"
-            ? normalizePhoneNumber(details.phone).phone
-            : "-"; // Column D: DI ĐỘNG
-        row[4] =
-          details.type === "Landline"
-            ? normalizePhoneNumber(details.phone).phone
-            : "-"; // Column E: CỐ ĐỊNH
+
+        const phoneDetails = normalizePhoneNumber(details.phone);
+        row[3] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
+        row[4] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
+
         row[5] = details.email || "-"; // Column F: Email
         row[6] = details.address || "-"; // Column G: Address
 
