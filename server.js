@@ -45,8 +45,8 @@ app.post("/process", upload.single("file"), async (req, res) => {
           details.email && details.email !== "-"
             ? {
                 t: "s",
-                v: searchQuery,
-                f: `HYPERLINK("${link}", "${searchQuery}")`,
+                v: details.email, // Hiển thị email
+                f: `HYPERLINK("mailto:${details.email}", "${details.email}")`, // Tạo hyperlink mailto
               }
             : "-"; // Column F: Email
 
@@ -100,7 +100,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const updatedFilePath = path.join(
       __dirname,
       "uploads",
-      `updated_data_${Date.now()}.xlsm`
+      `updated_data_${Date.now()}.xlsx`
     );
     xlsx.writeFile(updatedWorkbook, updatedFilePath);
 
@@ -117,7 +117,7 @@ async function searchGoogle(query) {
   // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
   // const cseId = "341005c8435be49e1";
 
-  const apiKey = "AIzaSyCUwoIfESwtDcjb2kDDGASJNqJCLk-5LvM";
+  const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
   const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
@@ -160,7 +160,7 @@ async function searchGoogleWithGov(query) {
   // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
   // const cseId = "341005c8435be49e1";
 
-  const apiKey = "AIzaSyCUwoIfESwtDcjb2kDDGASJNqJCLk-5LvM";
+  const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
   const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
