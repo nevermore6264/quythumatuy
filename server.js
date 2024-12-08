@@ -99,8 +99,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
 // Hàm tìm kiếm Facebook link
 async function searchGoogle(query) {
-  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  const cseId = "341005c8435be49e1";
+  // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
+  // const cseId = "341005c8435be49e1";
+
+  const apiKey = "AIzaSyCUwoIfESwtDcjb2kDDGASJNqJCLk-5LvM";
+  const cseId = "910d33337beac4ddb";
 
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
