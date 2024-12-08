@@ -21,6 +21,9 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
+    const hyperlinkStyle = {
+      font: { color: { rgb: "0000FF" }, underline: true }, // Màu xanh và gạch chân
+    };
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i]; // Access each row in the Excel sheet
@@ -41,13 +44,19 @@ app.post("/process", upload.single("file"), async (req, res) => {
         row[3] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
         row[4] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
 
-        row[5] = details.email || "-"; // Column F: Email
+        row[5] =
+          details.email && details.email !== "-"
+            ? {
+                f: `HYPERLINK("mailto:${details.email}", "${details.email}")`,
+                s: hyperlinkStyle,
+              }
+            : "-"; // Column F: Email
+
         row[6] = details.address || "-"; // Column G: Address
 
-        // Update Column E with the link as a clickable hyperlink in Excel
         row[1] =
           link && link !== "-"
-            ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+            ? { f: `HYPERLINK("${link}", "${searchQuery}")`, s: hyperlinkStyle }
             : searchQuery;
 
         results.push({ searchQuery, link, details });
@@ -103,7 +112,7 @@ async function searchGoogle(query) {
   // const cseId = "341005c8435be49e1";
 
   const apiKey = "AIzaSyCUwoIfESwtDcjb2kDDGASJNqJCLk-5LvM";
-  const cseId = "910d33337beac4ddb";
+  const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
