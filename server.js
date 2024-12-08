@@ -151,8 +151,11 @@ async function searchGoogle(query) {
 
 // Hàm tìm kiếm GOV link
 async function searchGoogleWithGov(query) {
-  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  const cseId = "341005c8435be49e1";
+  // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
+  // const cseId = "341005c8435be49e1";
+
+  const apiKey = "AIzaSyCUwoIfESwtDcjb2kDDGASJNqJCLk-5LvM";
+  const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
