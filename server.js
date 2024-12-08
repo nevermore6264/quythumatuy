@@ -21,9 +21,6 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
-    const hyperlinkStyle = {
-      font: { color: { rgb: "0000FF" }, underline: true }, // Màu xanh và gạch chân
-    };
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i]; // Access each row in the Excel sheet
@@ -47,8 +44,9 @@ app.post("/process", upload.single("file"), async (req, res) => {
         row[5] =
           details.email && details.email !== "-"
             ? {
-                f: `HYPERLINK("mailto:${details.email}", "${details.email}")`,
-                s: hyperlinkStyle,
+                t: "s",
+                v: searchQuery,
+                f: `HYPERLINK("${link}", "${searchQuery}")`,
               }
             : "-"; // Column F: Email
 
@@ -56,7 +54,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
         row[1] =
           link && link !== "-"
-            ? { f: `HYPERLINK("${link}", "${searchQuery}")`, s: hyperlinkStyle }
+            ? {
+                t: "s",
+                v: searchQuery,
+                f: `HYPERLINK("${link}", "${searchQuery}")`,
+              }
             : searchQuery;
 
         results.push({ searchQuery, link, details });
@@ -74,7 +76,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
         // Update Column E with the link as a clickable hyperlink in Excel
         row[1] =
           link && link !== "-"
-            ? { f: `HYPERLINK("${link}", "${searchQuery}")` }
+            ? {
+                t: "s",
+                v: searchQuery,
+                f: `HYPERLINK("${link}", "${searchQuery}")`,
+              }
             : searchQuery;
 
         results.push({ searchQuery, link });
@@ -94,7 +100,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const updatedFilePath = path.join(
       __dirname,
       "uploads",
-      `updated_data_${Date.now()}.xlsx`
+      `updated_data_${Date.now()}.xlsm`
     );
     xlsx.writeFile(updatedWorkbook, updatedFilePath);
 
