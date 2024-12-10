@@ -1,7 +1,10 @@
 const express = require("express");
 const multer = require("multer");
 const xlsx = require("xlsx");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+
+puppeteer.use(StealthPlugin());
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
@@ -35,6 +38,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
             ? await getFanpageDetails(link)
             : { phone: "-", email: "-", address: "-" };
 
+        console.log(">>>>>>>>>> details ", details);
         row[2] = link || "-"; // Column F: Facebook link
 
         const phoneDetails = normalizePhoneNumber(details.phone);
@@ -114,11 +118,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
 // Hàm tìm kiếm Facebook link
 async function searchGoogle(query) {
-  // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  // const cseId = "341005c8435be49e1";
+  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
+  const cseId = "341005c8435be49e1";
 
-  const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
-  const cseId = "67c1b1438f7244c19";
+  // const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
+  // const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
@@ -157,11 +161,11 @@ async function searchGoogle(query) {
 
 // Hàm tìm kiếm GOV link
 async function searchGoogleWithGov(query) {
-  // const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  // const cseId = "341005c8435be49e1";
+  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
+  const cseId = "341005c8435be49e1";
 
-  const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
-  const cseId = "67c1b1438f7244c19";
+  // const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
+  // const cseId = "67c1b1438f7244c19";
 
   async function performSearch(q) {
     const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
@@ -185,33 +189,76 @@ async function searchGoogleWithGov(query) {
   return await performSearch(query);
 }
 
-// Hàm thu thập thông tin fanpage
 async function getFanpageDetails(url) {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-blink-features=AutomationControlled",
+    ],
+  });
   const page = await browser.newPage();
-  await page.goto(url, { waitUntil: "networkidle2" });
 
-  const details = await page.evaluate(() => {
-    const data = {};
-    const icons = {
-      phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yT/r/Dc7-7AgwkwS.png",
-      email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
-      address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
-    };
-
-    Object.keys(icons).forEach((key) => {
-      const element = document.querySelector(`img[src*="${icons[key]}"]`);
-      const parent = element?.closest("div + div");
-      let value = parent?.textContent?.trim() || "-";
-
-      data[key] = value;
+  try {
+    // Đặt User-Agent và các headers
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
+    );
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "en-US,en;q=0.9",
     });
 
-    return data;
-  });
+    // Thiết lập viewport để giống người dùng thật
+    await page.setViewport({
+      width: 1366,
+      height: 768,
+    });
 
-  await browser.close();
-  return details;
+    // Điều hướng đến URL
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+
+    // Cuộn trang để mô phỏng hành vi người dùng
+    await page.evaluate(async () => {
+      let totalHeight = 0;
+      const distance = 100;
+      while (totalHeight < document.body.scrollHeight) {
+        window.scrollBy(0, distance);
+        totalHeight += distance;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    });
+
+    // Đảm bảo phần tử chính xuất hiện trước khi thu thập dữ liệu
+    await page.waitForSelector("body", { timeout: 10000 });
+
+    // Thu thập thông tin
+    const details = await page.evaluate(() => {
+      const data = {};
+      const icons = {
+        phone: "https://static.xx.fbcdn.net/rsrc.php/v4/yT/r/Dc7-7AgwkwS.png",
+        email: "https://static.xx.fbcdn.net/rsrc.php/v4/yE/r/2PIcyqpptfD.png",
+        address: "https://static.xx.fbcdn.net/rsrc.php/v4/yW/r/8k_Y-oVxbuU.png",
+      };
+
+      Object.keys(icons).forEach((key) => {
+        const element = document.querySelector(`img[src*="${icons[key]}"]`);
+        const parent = element?.closest("div + div");
+        let value = parent?.textContent?.trim() || "-";
+
+        data[key] = value;
+      });
+
+      return data;
+    });
+
+    return details;
+  } catch (error) {
+    console.error("Error fetching fanpage details:", error);
+    return { phone: "-", email: "-", address: "-" }; // Trả về giá trị mặc định khi có lỗi
+  } finally {
+    await browser.close();
+  }
 }
 
 function normalizePhoneNumber(rawPhone) {
@@ -222,6 +269,8 @@ function normalizePhoneNumber(rawPhone) {
 
   // 2. Chuyển đổi đầu số quốc tế (+84 hoặc 84) thành 0
   phone = phone.replace(/^(\+84|84)/, "0");
+
+  phone = phone.replace(/^(\+24|24)/, "024");
 
   // 3. Xử lý số điện thoại của các nhà mạng với đầu số cũ
   const carrierMap = {
