@@ -20,42 +20,39 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const filePath = req.file.path; // File path of uploaded Excel
     const workbook = xlsx.readFile(filePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
+    const chunkSize = 1000; // Số lượng bản ghi mỗi file
+    const filePaths = []; // Danh sách các file đã tạo
+    console.log("Bắt đầu xử lý dữ liệu...");
 
+    // Lặp qua dữ liệu, bắt đầu từ dòng 2 (bỏ qua tiêu đề)
     for (let i = 1; i < data.length; i++) {
-      const row = data[i]; // Access each row in the Excel sheet
-      const searchQuery = row[1]; // Column E, index 4
+      console.log(`Đang xử lý bản ghi thứ ${i}:`, data[i]);
+
+      const row = data[i];
+      const searchQuery = row[1];
 
       if (searchQuery && searchQuery.startsWith("Công an")) {
-        console.log(`Row ${i}: Processing Công an - ${searchQuery}`);
-
-        const link = await searchGoogle(searchQuery); // Search Facebook link
+        const link = row[2];
         const details =
           link && link !== "-"
             ? await getFanpageDetails(link)
             : { phone: "-", email: "-", address: "-" };
 
-        console.log(">>>>>>>>>> details ", details);
-        row[2] = link || "-"; // Column F: Facebook link
-
         const phoneDetails = normalizePhoneNumber(details.phone);
         row[3] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
         row[4] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
-
         row[5] =
           details.email && details.email !== "-"
             ? {
                 t: "s",
-                v: details.email, // Hiển thị email
-                f: `HYPERLINK("mailto:${details.email}", "${details.email}")`, // Tạo hyperlink mailto
+                v: details.email,
+                f: `HYPERLINK("mailto:${details.email}", "${details.email}")`,
               }
             : "-"; // Column F: Email
-
         row[6] = details.address || "-"; // Column G: Address
-
         row[1] =
           link && link !== "-"
             ? {
@@ -67,17 +64,12 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
         results.push({ searchQuery, link, details });
       } else if (searchQuery && searchQuery.includes("UBND")) {
-        console.log(`Row ${i}: Processing UBND - ${searchQuery}`);
-
-        const link = await searchGoogleWithGov(searchQuery); // Tìm GOV link
-
+        const link = row[2];
         row[2] = link || "-"; // Column C: GOV link
         row[3] = "-"; // Column D: DI ĐỘNG
         row[4] = "-"; // Column E: CỐ ĐỊNH
         row[5] = "-"; // Column F: EMAIL
         row[6] = "-"; // Column G: ĐỊA CHỈ
-
-        // Update Column E with the link as a clickable hyperlink in Excel
         row[1] =
           link && link !== "-"
             ? {
@@ -91,103 +83,35 @@ app.post("/process", upload.single("file"), async (req, res) => {
       }
     }
 
-    // Create updated worksheet with modified data
-    const updatedWorksheet = xlsx.utils.aoa_to_sheet(data);
-    const updatedWorkbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      updatedWorkbook,
-      updatedWorksheet,
-      "Updated Data"
-    );
+    // Chia dữ liệu thành các nhóm 1000 dòng
+    const chunks = [];
+    for (let i = 1; i < data.length; i += chunkSize) {
+      chunks.push(data.slice(i, i + chunkSize));
+    }
 
-    // Save the updated Excel file
-    const updatedFilePath = path.join(
-      __dirname,
-      "uploads",
-      `updated_data_${Date.now()}.xlsx`
-    );
-    xlsx.writeFile(updatedWorkbook, updatedFilePath);
+    // Tạo file Excel cho từng nhóm
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const updatedWorksheet = xlsx.utils.aoa_to_sheet([data[0], ...chunk]); // Bao gồm tiêu đề
+      const updatedWorkbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(updatedWorkbook, updatedWorksheet, "Data");
 
-    fs.unlinkSync(filePath); // Delete original Excel file after processing
-    res.json({ results, updatedFilePath }); // Return the updated file path
+      const updatedFilePath = path.join(
+        __dirname,
+        "uploads",
+        `updated_data_${i + 1}_${Date.now()}.xlsx`
+      );
+      xlsx.writeFile(updatedWorkbook, updatedFilePath);
+      filePaths.push(updatedFilePath); // Thêm file vào danh sách
+    }
+
+    fs.unlinkSync(filePath); // Xóa file gốc sau khi xử lý
+    res.json({ filePaths }); // Trả về danh sách các file
   } catch (error) {
     console.error(error);
     res.status(500).send("An error occurred");
   }
 });
-
-// Hàm tìm kiếm Facebook link
-async function searchGoogle(query) {
-  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  const cseId = "341005c8435be49e1";
-
-  // const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
-  // const cseId = "67c1b1438f7244c19";
-
-  async function performSearch(q) {
-    const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
-      q
-    )}&cx=${cseId}&key=${apiKey}&excludeTerms=story.php&as_sitesearch=facebook.com`;
-    try {
-      const response = await axios.get(url);
-      const searchResults = response.data.items;
-
-      const facebookLinks = searchResults
-        .map((item) => item.link)
-        .filter(
-          (link) =>
-            link.startsWith("https://www.facebook.com") &&
-            !link.includes("posts") &&
-            !link.includes(".php") &&
-            !link.includes("photos") &&
-            !link.includes("photo") &&
-            !link.includes("rell")
-        );
-
-      return facebookLinks[0] || null;
-    } catch (error) {
-      console.error("Error performing search:", error);
-      return null;
-    }
-  }
-
-  let facebookLink = await performSearch(query);
-  if (!facebookLink) {
-    facebookLink = await performSearch(`Tuổi Trẻ ${query}`);
-  }
-
-  return facebookLink || "-";
-}
-
-// Hàm tìm kiếm GOV link
-async function searchGoogleWithGov(query) {
-  const apiKey = "AIzaSyB-zjI4n-sXmad_ZQ76juPrzeX1WQq7xbg";
-  const cseId = "341005c8435be49e1";
-
-  // const apiKey = "AIzaSyDKb2YS4vnB5fOfJu-cqc5Lg9YLF_f2Fsc";
-  // const cseId = "67c1b1438f7244c19";
-
-  async function performSearch(q) {
-    const url = `https://www.googleapis.com/customsearch/v1/?q=${encodeURIComponent(
-      q
-    )}&cx=${cseId}&key=${apiKey}&siteSearch=gov.vn`;
-    try {
-      const response = await axios.get(url);
-      const searchResults = response.data.items;
-
-      const govLinks = searchResults
-        .map((item) => item.link)
-        .filter((link) => link.includes(".gov.vn"));
-
-      return govLinks[0] || null;
-    } catch (error) {
-      console.error("Error performing search:", error);
-      return null;
-    }
-  }
-
-  return await performSearch(query);
-}
 
 async function getFanpageDetails(url) {
   const browser = await puppeteer.launch({
