@@ -7,7 +7,6 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 puppeteer.use(StealthPlugin());
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -23,8 +22,6 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
     const results = [];
-    const chunkSize = 1000; // Số lượng bản ghi mỗi file
-    const filePaths = []; // Danh sách các file đã tạo
     console.log("Bắt đầu xử lý dữ liệu...");
 
     // Lặp qua dữ liệu, bắt đầu từ dòng 2 (bỏ qua tiêu đề)
@@ -35,15 +32,17 @@ app.post("/process", upload.single("file"), async (req, res) => {
       const searchQuery = row[1];
 
       if (searchQuery && searchQuery.startsWith("Công an")) {
-        const link = row[2];
+        const regex = /HYPERLINK\("([^"]+)",/i;
+        const match = row[2].f.match(regex);
+        const link = match ? match[1] : "-";
         const details =
           link && link !== "-"
             ? await getFanpageDetails(link)
             : { phone: "-", email: "-", address: "-" };
 
         const phoneDetails = normalizePhoneNumber(details.phone);
-        row[3] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
-        row[4] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
+        row[4] = details.address || "-"; // Column G: Address
+
         row[5] =
           details.email && details.email !== "-"
             ? {
@@ -52,7 +51,6 @@ app.post("/process", upload.single("file"), async (req, res) => {
                 f: `HYPERLINK("mailto:${details.email}", "${details.email}")`,
               }
             : "-"; // Column F: Email
-        row[6] = details.address || "-"; // Column G: Address
         row[1] =
           link && link !== "-"
             ? {
@@ -61,15 +59,16 @@ app.post("/process", upload.single("file"), async (req, res) => {
                 f: `HYPERLINK("${link}", "${searchQuery}")`,
               }
             : searchQuery;
-
+        row[6] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
+        row[7] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
         results.push({ searchQuery, link, details });
       } else if (searchQuery && searchQuery.includes("UBND")) {
         const link = row[2];
         row[2] = link || "-"; // Column C: GOV link
-        row[3] = "-"; // Column D: DI ĐỘNG
-        row[4] = "-"; // Column E: CỐ ĐỊNH
+        row[4] = "-"; // Column G: ĐỊA CHỈ
         row[5] = "-"; // Column F: EMAIL
-        row[6] = "-"; // Column G: ĐỊA CHỈ
+        row[6] = "-"; // Column D: DI ĐỘNG
+        row[7] = "-"; // Column E: CỐ ĐỊNH
         row[1] =
           link && link !== "-"
             ? {
@@ -83,30 +82,20 @@ app.post("/process", upload.single("file"), async (req, res) => {
       }
     }
 
-    // Chia dữ liệu thành các nhóm 1000 dòng
-    const chunks = [];
-    for (let i = 1; i < data.length; i += chunkSize) {
-      chunks.push(data.slice(i, i + chunkSize));
-    }
+    // Tạo file Excel chứa toàn bộ dữ liệu đã xử lý (bao gồm tiêu đề)
+    const updatedWorksheet = xlsx.utils.aoa_to_sheet(data);
+    const updatedWorkbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(updatedWorkbook, updatedWorksheet, "Data");
 
-    // Tạo file Excel cho từng nhóm
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const updatedWorksheet = xlsx.utils.aoa_to_sheet([data[0], ...chunk]); // Bao gồm tiêu đề
-      const updatedWorkbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(updatedWorkbook, updatedWorksheet, "Data");
-
-      const updatedFilePath = path.join(
-        __dirname,
-        "uploads",
-        `updated_data_${i + 1}_${Date.now()}.xlsx`
-      );
-      xlsx.writeFile(updatedWorkbook, updatedFilePath);
-      filePaths.push(updatedFilePath); // Thêm file vào danh sách
-    }
+    const updatedFilePath = path.join(
+      __dirname,
+      "uploads",
+      `updated_data_${Date.now()}.xlsx`
+    );
+    xlsx.writeFile(updatedWorkbook, updatedFilePath);
 
     fs.unlinkSync(filePath); // Xóa file gốc sau khi xử lý
-    res.json({ filePaths }); // Trả về danh sách các file
+    res.json({ filePath: updatedFilePath }); // Trả về file duy nhất
   } catch (error) {
     console.error(error);
     res.status(500).send("An error occurred");
