@@ -19,7 +19,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const filePath = req.file.path; // File path of uploaded Excel
     const workbook = xlsx.readFile(filePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+    const data = xlsx.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
     const results = [];
     console.log("Bắt đầu xử lý dữ liệu...");
@@ -30,17 +30,37 @@ app.post("/process", upload.single("file"), async (req, res) => {
 
       const row = data[i];
       const searchQuery = row[1];
-
       if (searchQuery && searchQuery.startsWith("Công an")) {
-        const regex = /HYPERLINK\("([^"]+)",/i;
-        const match = row[2].f.match(regex);
-        const link = match ? match[1] : "-";
+        // Thay vì lấy hyperlink từ row[1] trong mảng data, ta truy xuất trực tiếp từ đối tượng sheet.
+        const cellAddress = xlsx.utils.encode_cell({ c: 1, r: i }); // c:1 tương ứng với cột B, r: i là số hàng
+        const cell = sheet[cellAddress];
+        let link = "-";
+
+        if (cell) {
+          if (cell.l && cell.l.Target) {
+            // Nếu cell có thuộc tính 'l' chứa thông tin hyperlink
+            link = cell.l.Target;
+          } else if (cell.f) {
+            // Nếu không có thuộc tính 'l', thử trích xuất từ công thức (formula)
+            const regex = /HYPERLINK\("([^"]+)",/i;
+            const match = cell.f.match(regex);
+            link = match ? match[1] : "-";
+          } else {
+            // Nếu cell không chứa hyperlink, dùng giá trị (v) của cell
+            link = cell.v || "-";
+          }
+        } else {
+        }
+
+        // Lấy thông tin chi tiết dựa trên link đã lấy
         const details =
           link && link !== "-"
             ? await getFanpageDetails(link)
             : { phone: "-", email: "-", address: "-" };
 
         const phoneDetails = normalizePhoneNumber(details.phone);
+
+        // Cập nhật các cột tương ứng:
         row[4] = details.address || "-"; // Column G: Address
 
         row[5] =
@@ -51,36 +71,21 @@ app.post("/process", upload.single("file"), async (req, res) => {
                 f: `HYPERLINK("mailto:${details.email}", "${details.email}")`,
               }
             : "-"; // Column F: Email
-        row[1] =
-          link && link !== "-"
-            ? {
-                t: "s",
-                v: searchQuery,
-                f: `HYPERLINK("${link}", "${searchQuery}")`,
-              }
-            : searchQuery;
+
         row[6] = phoneDetails.type === "Mobile" ? phoneDetails.phone : "-"; // Column D: DI ĐỘNG
         row[7] = phoneDetails.type === "Landline" ? phoneDetails.phone : "-"; // Column E: CỐ ĐỊNH
-        results.push({ searchQuery, link, details });
-      } else if (searchQuery && searchQuery.includes("UBND")) {
-        const link = row[2];
-        row[2] = link || "-"; // Column C: GOV link
-        row[4] = "-"; // Column G: ĐỊA CHỈ
-        row[5] = "-"; // Column F: EMAIL
-        row[6] = "-"; // Column D: DI ĐỘNG
-        row[7] = "-"; // Column E: CỐ ĐỊNH
-        row[1] =
-          link && link !== "-"
-            ? {
-                t: "s",
-                v: searchQuery,
-                f: `HYPERLINK("${link}", "${searchQuery}")`,
-              }
-            : searchQuery;
 
-        results.push({ searchQuery, link });
+        // Giữ lại searchQuery ở row[1] (bạn có thể cập nhật thêm nếu cần)
+        row[1] = searchQuery;
+        results.push({ searchQuery, link, details });
       }
     }
+
+    const firstId = data[1] && data[1][0] ? data[1][0] : "Unknown";
+    const lastId =
+      data[data.length - 1] && data[data.length - 1][0]
+        ? data[data.length - 1][0]
+        : "Unknown";
 
     // Tạo file Excel chứa toàn bộ dữ liệu đã xử lý (bao gồm tiêu đề)
     const updatedWorksheet = xlsx.utils.aoa_to_sheet(data);
@@ -90,7 +95,7 @@ app.post("/process", upload.single("file"), async (req, res) => {
     const updatedFilePath = path.join(
       __dirname,
       "uploads",
-      `updated_data_${Date.now()}.xlsx`
+      `updated_data_${firstId}_${lastId}.xlsx`
     );
     xlsx.writeFile(updatedWorkbook, updatedFilePath);
 
@@ -103,6 +108,11 @@ app.post("/process", upload.single("file"), async (req, res) => {
 });
 
 async function getFanpageDetails(url) {
+  if (!url || typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+    console.error("Invalid URL:", url);
+    return { phone: "-", email: "-", address: "-" };
+  }
+
   const browser = await puppeteer.launch({
     headless: true,
     args: [
@@ -111,27 +121,21 @@ async function getFanpageDetails(url) {
       "--disable-blink-features=AutomationControlled",
     ],
   });
+
   const page = await browser.newPage();
 
   try {
-    // Đặt User-Agent và các headers
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
     );
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "en-US,en;q=0.9",
-    });
 
-    // Thiết lập viewport để giống người dùng thật
-    await page.setViewport({
-      width: 1366,
-      height: 768,
-    });
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    // Điều hướng đến URL
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.setViewport({ width: 1366, height: 768 });
 
-    // Cuộn trang để mô phỏng hành vi người dùng
+    console.log(`Navigating to URL: ${url}`);
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+
     await page.evaluate(async () => {
       let totalHeight = 0;
       const distance = 100;
@@ -142,10 +146,8 @@ async function getFanpageDetails(url) {
       }
     });
 
-    // Đảm bảo phần tử chính xuất hiện trước khi thu thập dữ liệu
     await page.waitForSelector("body", { timeout: 10000 });
 
-    // Thu thập thông tin
     const details = await page.evaluate(() => {
       const data = {};
       const icons = {
@@ -158,7 +160,6 @@ async function getFanpageDetails(url) {
         const element = document.querySelector(`img[src*="${icons[key]}"]`);
         const parent = element?.closest("div + div");
         let value = parent?.textContent?.trim() || "-";
-
         data[key] = value;
       });
 
@@ -168,7 +169,7 @@ async function getFanpageDetails(url) {
     return details;
   } catch (error) {
     console.error("Error fetching fanpage details:", error);
-    return { phone: "-", email: "-", address: "-" }; // Trả về giá trị mặc định khi có lỗi
+    return { phone: "-", email: "-", address: "-" };
   } finally {
     await browser.close();
   }
