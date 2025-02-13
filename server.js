@@ -11,6 +11,7 @@ const path = require("path");
 const app = express();
 const upload = multer({ dest: "uploads/" });
 const cors = require("cors");
+
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -78,6 +79,18 @@ app.post("/process", upload.single("file"), async (req, res) => {
         // Giữ lại searchQuery ở row[1] (bạn có thể cập nhật thêm nếu cần)
         row[1] = searchQuery;
         results.push({ searchQuery, link, details });
+      } else if (searchQuery && searchQuery.includes("UBND")) {
+        const link = row[2];
+
+        row[2] = link || "-"; // Column C: GOV link
+        row[4] = "-"; // Column G: ĐỊA CHỈ
+        row[5] = "-"; // Column F: EMAIL
+        row[6] = "-"; // Column D: DI ĐỘNG
+        row[7] = "-"; // Column E: CỐ ĐỊNH
+
+        row[1] = searchQuery;
+
+        results.push({ searchQuery, link });
       }
     }
 
@@ -108,13 +121,13 @@ app.post("/process", upload.single("file"), async (req, res) => {
 });
 
 async function getFanpageDetails(url) {
-  if (!url || typeof url !== "string" || !/^https?:\/\//i.test(url)) {
-    console.error("Invalid URL:", url);
+  if (!url || typeof url !== "string" || !/^https?:\/\//i.test(url.trim())) {
+    console.error("Invalid URL detected:", url);
     return { phone: "-", email: "-", address: "-" };
   }
 
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: false, // Sử dụng chế độ headful
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -138,14 +151,22 @@ async function getFanpageDetails(url) {
 
     await page.evaluate(async () => {
       let totalHeight = 0;
-      const distance = 100;
       while (totalHeight < document.body.scrollHeight) {
+        let distance = Math.floor(Math.random() * (200 - 50 + 1)) + 50; // Cuộn 50-200px
         window.scrollBy(0, distance);
         totalHeight += distance;
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000
+          )
+        );
       }
     });
 
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000)
+    );
     await page.waitForSelector("body", { timeout: 10000 });
 
     const details = await page.evaluate(() => {
@@ -171,7 +192,7 @@ async function getFanpageDetails(url) {
     console.error("Error fetching fanpage details:", error);
     return { phone: "-", email: "-", address: "-" };
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
